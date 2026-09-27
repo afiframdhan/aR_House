@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
   <title>AR Family Finance</title>
-  <link rel="stylesheet" href="styles.css?v=1.2.1" />
+  <link rel="stylesheet" href="styles.css?v=1.3.0" />
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -66,9 +66,27 @@
       </section>
 
       <section id="routinesPage" class="page hidden">
-        <div class="section-toolbar"><div><p class="eyebrow">RUMAH TANGGA</p><h3>Pengeluaran Rutin Bulanan</h3><p class="muted small-text">Cash/ATM otomatis memakai Rumah · Tunai. Online otomatis memakai Rumah · Bank, kecuali Anda pilih akun lain.</p></div><button id="addRoutineBtn" class="btn primary">+ Pengeluaran Rutin</button></div>
+        <div class="section-toolbar"><div><p class="eyebrow">RUMAH TANGGA</p><h3>Pengeluaran Rutin Bulanan</h3><p class="muted small-text">Gunakan ringkasan ini untuk menyiapkan uang Cash/ATM dan dana yang perlu dipindahkan ke rekening khusus pembayaran online.</p></div><button id="addRoutineBtn" class="btn primary">+ Pengeluaran Rutin</button></div>
+
+        <div id="routineFundCards" class="routine-fund-grid"></div>
+
+        <div class="routine-controls panel">
+          <div class="segmented" id="routineModeFilter">
+            <button class="seg-btn active" data-routine-mode="ALL">Semua</button>
+            <button class="seg-btn" data-routine-mode="ONLINE">Online</button>
+            <button class="seg-btn" data-routine-mode="CASH_ATM">Cash / ATM</button>
+          </div>
+          <div class="segmented" id="routineViewToggle">
+            <button class="seg-btn active" data-routine-view="CARD">Card</button>
+            <button class="seg-btn" data-routine-view="TABLE">Tabel</button>
+          </div>
+        </div>
+
         <div id="routineSummary" class="mini-summary"></div>
         <div id="routineGrid" class="routine-grid"></div>
+        <div id="routineTableWrap" class="table-wrap panel hidden">
+          <table class="routine-table"><thead><tr><th>Status</th><th>Pengeluaran</th><th>Metode</th><th>Jatuh Tempo</th><th>Akun</th><th class="align-right">Nominal</th><th>Aksi</th></tr></thead><tbody id="routineTable"></tbody></table>
+        </div>
       </section>
 
       <section id="accountsPage" class="page hidden">
@@ -92,7 +110,7 @@
   <input id="photoInput" type="file" accept="image/*" hidden />
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script src="config.js?v=1.2.1"></script>
-  <script src="app.js?v=1.2.1"></script>
+  <script src="config.js?v=1.3.0"></script>
+  <script src="app.js?v=1.3.0"></script>
 </body>
 </html>
