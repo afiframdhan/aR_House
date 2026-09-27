@@ -3,45 +3,39 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#101827" />
+  <meta name="theme-color" content="#0f172a" />
   <title>AR Family Finance</title>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
-
   <section id="loginView" class="login-shell">
     <div class="login-card">
       <div class="brand-mark">AR</div>
-      <div>
-        <p class="eyebrow">AR FAMILY</p>
-        <h1>Finance Dashboard</h1>
-        <p class="muted">Rumah Tangga & AR Studio dalam satu dashboard.</p>
-      </div>
+      <div><p class="eyebrow">AR FAMILY</p><h1>Finance Dashboard</h1><p class="muted">Rumah Tangga & AR Studio dalam satu aplikasi.</p></div>
       <form id="loginForm" class="stack-lg">
-        <label>Username
-          <input id="loginUsername" autocomplete="username" required placeholder="Masukkan username" />
-        </label>
-        <label>Password
-          <input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Masukkan password" />
-        </label>
+        <label>Username<input id="loginUsername" autocomplete="username" required /></label>
+        <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
         <button id="loginButton" class="btn primary" type="submit">Masuk</button>
       </form>
-      <p id="loginHint" class="tiny muted">Username dan password dikelola dari Spreadsheet.</p>
+      <p class="tiny muted">Login tersimpan di perangkat ini sampai Anda menekan Keluar.</p>
     </div>
   </section>
 
   <div id="appView" class="app-shell hidden">
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
-        <div class="brand-mark small">AR</div>
-        <div><strong>AR Family</strong><span>Finance</span></div>
-      </div>
+      <div class="sidebar-brand"><div class="brand-mark small">AR</div><div><strong>AR Family</strong><span>Finance</span></div></div>
       <nav>
-        <button class="nav-link active" data-page="dashboard"><span>⌂</span> Dashboard</button>
+        <p class="nav-group">DASHBOARD</p>
+        <button class="nav-link active" data-page="overall"><span>⌂</span> Keseluruhan</button>
+        <button class="nav-link" data-page="studio"><span>◈</span> AR Studio</button>
+        <button class="nav-link" data-page="house"><span>⌂</span> Rumah Tangga</button>
+        <p class="nav-group">KEUANGAN</p>
         <button class="nav-link" data-page="transactions"><span>↕</span> Transaksi</button>
+        <button class="nav-link" data-page="routines"><span>↻</span> Pengeluaran Rutin</button>
         <button class="nav-link" data-page="accounts"><span>◫</span> Akun & Saldo</button>
+        <p class="nav-group">AKUN</p>
+        <button class="nav-link" data-page="profile"><span>◎</span> Profil</button>
       </nav>
       <div class="sidebar-footer">
         <div class="user-chip"><div class="avatar" id="userAvatar">A</div><div><strong id="userName">Admin</strong><span id="userRole">ADMIN</span></div></div>
@@ -51,96 +45,51 @@
 
     <main class="main">
       <header class="topbar">
-        <button id="menuBtn" class="icon-btn mobile-only" aria-label="Menu">☰</button>
-        <div>
-          <p class="eyebrow" id="pageEyebrow">RINGKASAN KEUANGAN</p>
-          <h2 id="pageTitle">Dashboard</h2>
-        </div>
-        <div class="top-actions">
-          <select id="bookFilter" class="compact-select">
-            <option value="ALL">Semua Buku</option>
-            <option value="HOUSE">Rumah Tangga</option>
-            <option value="STUDIO">AR Studio</option>
-          </select>
+        <button id="menuBtn" class="icon-btn mobile-only">☰</button>
+        <div><p class="eyebrow" id="pageEyebrow">RINGKASAN KEUANGAN</p><h2 id="pageTitle">Dashboard Keseluruhan</h2></div>
+        <div class="top-actions" id="financeFilters">
           <select id="monthFilter" class="compact-select"></select>
           <select id="yearFilter" class="compact-select"></select>
           <button id="addTransactionBtn" class="btn primary">+ Transaksi</button>
         </div>
       </header>
 
-      <section id="dashboardPage" class="page">
-        <div class="kpi-grid" id="kpiGrid"></div>
-        <div class="chart-grid">
-          <article class="panel span-2">
-            <div class="panel-head"><div><p class="eyebrow">12 BULAN</p><h3>Arus Kas</h3></div></div>
-            <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-          </article>
-          <article class="panel">
-            <div class="panel-head"><div><p class="eyebrow">KATEGORI</p><h3>Pengeluaran</h3></div></div>
-            <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
-          </article>
-        </div>
-        <div class="content-grid">
-          <article class="panel">
-            <div class="panel-head"><div><p class="eyebrow">SALDO</p><h3>Akun</h3></div></div>
-            <div id="accountBalances" class="account-list"></div>
-          </article>
-          <article class="panel span-2">
-            <div class="panel-head"><div><p class="eyebrow">TERBARU</p><h3>Transaksi Terakhir</h3></div><button class="text-btn" data-go="transactions">Lihat semua</button></div>
-            <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Buku</th><th>Jenis</th><th>Uraian</th><th>Nominal</th></tr></thead><tbody id="recentTransactions"></tbody></table></div>
-          </article>
-        </div>
-      </section>
+      <section id="overallPage" class="page dashboard-page"></section>
+      <section id="studioPage" class="page dashboard-page hidden"></section>
+      <section id="housePage" class="page dashboard-page hidden"></section>
 
       <section id="transactionsPage" class="page hidden">
         <article class="panel">
-          <div class="panel-head wrap">
-            <div><p class="eyebrow">DATABASE</p><h3>Semua Transaksi</h3></div>
-            <div class="search-row">
-              <input id="transactionSearch" placeholder="Cari transaksi..." />
-              <select id="typeFilter" class="compact-select">
-                <option value="ALL">Semua Jenis</option>
-                <option value="INCOME">Pemasukan</option>
-                <option value="EXPENSE">Pengeluaran</option>
-                <option value="TRANSFER">Transfer</option>
-                <option value="PRIVE">Prive</option>
-              </select>
-            </div>
-          </div>
+          <div class="panel-head wrap"><div><p class="eyebrow">DATABASE</p><h3>Semua Transaksi</h3></div><div class="search-row"><input id="transactionSearch" placeholder="Cari transaksi..." /><select id="bookFilter" class="compact-select"><option value="ALL">Semua Buku</option><option value="HOUSE">Rumah Tangga</option><option value="STUDIO">AR Studio</option></select><select id="typeFilter" class="compact-select"><option value="ALL">Semua Jenis</option><option value="INCOME">Pemasukan</option><option value="EXPENSE">Pengeluaran</option><option value="TRANSFER">Transfer</option><option value="PRIVE">Prive</option></select></div></div>
           <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Buku</th><th>Jenis</th><th>Kategori</th><th>Uraian</th><th>Akun</th><th>Nominal</th><th></th></tr></thead><tbody id="transactionsTable"></tbody></table></div>
         </article>
       </section>
 
+      <section id="routinesPage" class="page hidden">
+        <div class="section-toolbar"><div><p class="eyebrow">RUMAH TANGGA</p><h3>Pengeluaran Rutin Bulanan</h3><p class="muted small-text">Cash/ATM otomatis memakai Rumah · Tunai. Online otomatis memakai Rumah · Bank, kecuali Anda pilih akun lain.</p></div><button id="addRoutineBtn" class="btn primary">+ Pengeluaran Rutin</button></div>
+        <div id="routineSummary" class="mini-summary"></div>
+        <div id="routineGrid" class="routine-grid"></div>
+      </section>
+
       <section id="accountsPage" class="page hidden">
-        <div class="content-grid">
-          <article class="panel span-2"><div class="panel-head"><div><p class="eyebrow">SALDO BERJALAN</p><h3>Rekening & Kas</h3></div></div><div id="accountCards" class="account-card-grid"></div></article>
-          <article class="panel"><div class="panel-head"><div><p class="eyebrow">ATURAN</p><h3>Pencatatan</h3></div></div><div class="rules"><p><b>Pemasukan</b> → isi akun tujuan.</p><p><b>Pengeluaran / prive</b> → isi akun asal.</p><p><b>Transfer</b> → isi akun asal dan tujuan.</p><p><b>Tarik ATM</b> → Bank ke Tunai, bukan pengeluaran.</p><p><b>Studio → Rumah</b> → Prive Studio + Pemasukan “Usaha studio” di Rumah.</p></div></article>
+        <div class="content-grid"><article class="panel span-2"><div class="panel-head"><div><p class="eyebrow">SALDO BERJALAN</p><h3>Rekening & Kas</h3></div></div><div id="accountCards" class="account-card-grid"></div></article><article class="panel"><div class="panel-head"><div><p class="eyebrow">ATURAN</p><h3>Pencatatan</h3></div></div><div class="rules"><p><b>Pemasukan</b> → akun tujuan.</p><p><b>Pengeluaran / prive</b> → akun asal.</p><p><b>Transfer</b> → akun asal + tujuan.</p><p><b>Tarik ATM</b> → Bank ke Tunai, bukan pengeluaran.</p></div></article></div>
+      </section>
+
+      <section id="profilePage" class="page hidden">
+        <div class="profile-layout">
+          <article class="panel profile-card"><div class="profile-photo-wrap"><div id="profilePhotoPreview" class="profile-photo"></div><button id="changePhotoBtn" class="btn ghost">Ganti & Crop Foto</button></div><div><p class="eyebrow">AKUN AKTIF</p><h3 id="profileDisplayName">Administrator</h3><p class="muted" id="profileDisplayUser">@admin</p></div></article>
+          <article class="panel"><div class="panel-head"><div><p class="eyebrow">PENGATURAN</p><h3>Profil & Login</h3></div></div><form id="profileForm" class="form-grid"><label>Nama<input id="profileName" required /></label><label>Username<input id="profileUsername" required /></label><label class="span-2">Password baru<input id="profilePassword" type="password" placeholder="Kosongkan jika tidak ingin mengganti" /></label><div class="span-2 modal-actions"><button class="btn primary" type="submit">Simpan Profil</button></div></form></article>
         </div>
       </section>
     </main>
   </div>
 
-  <dialog id="transactionDialog" class="modal">
-    <form id="transactionForm" method="dialog">
-      <div class="modal-head"><div><p class="eyebrow">TRANSAKSI</p><h3 id="transactionModalTitle">Tambah Transaksi</h3></div><button type="button" class="icon-btn" id="closeModalBtn">×</button></div>
-      <input type="hidden" id="txId" />
-      <div class="form-grid">
-        <label>Tanggal<input type="date" id="txDate" required /></label>
-        <label>Buku<select id="txBook" required><option value="HOUSE">Rumah Tangga</option><option value="STUDIO">AR Studio</option></select></label>
-        <label>Jenis<select id="txType" required><option value="INCOME">Pemasukan</option><option value="EXPENSE">Pengeluaran</option><option value="TRANSFER">Transfer</option><option value="PRIVE">Prive</option></select></label>
-        <label>Kategori<select id="txCategory" required></select></label>
-        <label class="span-2">Uraian / Layanan<input id="txDescription" required placeholder="Contoh: Belanja bulanan / Mixing lagu" /></label>
-        <label>Klien / Pihak<input id="txParty" placeholder="Opsional" /></label>
-        <label>Metode<select id="txMethod"><option>Transfer</option><option>Cash</option><option>Debit</option><option>QRIS</option><option>Lainnya</option></select></label>
-        <label>Akun Asal<select id="txFromAccount"><option value="">— Tidak ada —</option></select></label>
-        <label>Akun Tujuan<select id="txToAccount"><option value="">— Tidak ada —</option></select></label>
-        <label class="span-2">Nominal (Rp)<input id="txAmount" type="number" min="0" step="1" required placeholder="0" /></label>
-        <label class="span-2">Catatan<textarea id="txNote" rows="3" placeholder="Opsional"></textarea></label>
-      </div>
-      <div id="transactionRuleHint" class="hint"></div>
-      <div class="modal-actions"><button type="button" class="btn ghost" id="cancelModalBtn">Batal</button><button class="btn primary" id="saveTransactionBtn" type="submit">Simpan</button></div>
-    </form>
-  </dialog>
+  <dialog id="transactionDialog" class="modal"><form id="transactionForm" method="dialog"><div class="modal-head"><div><p class="eyebrow">TRANSAKSI</p><h3 id="transactionModalTitle">Tambah Transaksi</h3></div><button type="button" class="icon-btn" id="closeModalBtn">×</button></div><input type="hidden" id="txId" /><div class="form-grid"><label>Tanggal<input type="date" id="txDate" required /></label><label>Buku<select id="txBook" required><option value="HOUSE">Rumah Tangga</option><option value="STUDIO">AR Studio</option></select></label><label>Jenis<select id="txType" required><option value="INCOME">Pemasukan</option><option value="EXPENSE">Pengeluaran</option><option value="TRANSFER">Transfer</option><option value="PRIVE">Prive</option></select></label><label>Kategori<select id="txCategory" required></select></label><label class="span-2">Uraian / Layanan<input id="txDescription" required /></label><label>Klien / Pihak<input id="txParty" /></label><label>Metode<select id="txMethod"><option>Transfer</option><option>Cash</option><option>Debit</option><option>QRIS</option><option>Online</option><option>Lainnya</option></select></label><label>Akun Asal<select id="txFromAccount"><option value="">— Tidak ada —</option></select></label><label>Akun Tujuan<select id="txToAccount"><option value="">— Tidak ada —</option></select></label><label class="span-2">Nominal (Rp)<input id="txAmount" type="number" min="0" step="1" required /></label><label class="span-2">Catatan<textarea id="txNote" rows="3"></textarea></label></div><div id="transactionRuleHint" class="hint"></div><div class="modal-actions"><button type="button" class="btn ghost" id="cancelModalBtn">Batal</button><button class="btn primary" id="saveTransactionBtn" type="submit">Simpan</button></div></form></dialog>
+
+  <dialog id="routineDialog" class="modal"><form id="routineForm" method="dialog"><div class="modal-head"><div><p class="eyebrow">RUMAH TANGGA</p><h3 id="routineModalTitle">Pengeluaran Rutin</h3></div><button type="button" class="icon-btn" id="closeRoutineBtn">×</button></div><input type="hidden" id="routineId" /><div class="form-grid"><label class="span-2">Nama Tagihan / Pengeluaran<input id="routineDescription" required placeholder="Contoh: Listrik, sekolah, internet" /></label><label>Kategori<select id="routineCategory"></select></label><label>Nominal / bulan<input id="routineAmount" type="number" min="0" required /></label><label>Metode Bayar<select id="routinePaymentMode"><option value="ONLINE">Online / Bank</option><option value="CASH_ATM">Cash / ATM</option></select></label><label>Tanggal Jatuh Tempo<input id="routineDueDay" type="number" min="1" max="31" value="1" /></label><label class="span-2">Akun Pembayaran<select id="routineFromAccount"></select></label><label class="span-2 check-label"><input id="routineActive" type="checkbox" checked /> Aktif setiap bulan</label><label class="span-2">Catatan<textarea id="routineNote" rows="3"></textarea></label></div><div class="modal-actions"><button type="button" class="btn ghost" id="cancelRoutineBtn">Batal</button><button class="btn primary" type="submit">Simpan</button></div></form></dialog>
+
+  <dialog id="cropDialog" class="modal crop-modal"><div class="modal-head"><div><p class="eyebrow">FOTO PROFIL</p><h3>Crop Foto</h3></div><button type="button" class="icon-btn" id="closeCropBtn">×</button></div><div class="crop-stage"><canvas id="cropCanvas" width="320" height="320"></canvas></div><label>Zoom<input id="cropZoom" type="range" min="1" max="3" step="0.01" value="1" /></label><p class="tiny muted">Geser foto dengan mouse atau jari untuk mengatur posisi.</p><div class="modal-actions"><button id="cancelCropBtn" class="btn ghost" type="button">Batal</button><button id="saveCropBtn" class="btn primary" type="button">Pakai Foto</button></div></dialog>
+  <input id="photoInput" type="file" accept="image/*" hidden />
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="config.js"></script>
