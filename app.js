@@ -1,8 +1,8 @@
 (() => {
   'use strict';
   const API_URL = window.AR_FINANCE_CONFIG?.API_URL || '';
-  const CACHE_KEY='arFinanceCacheV12', TOKEN_KEY='arFinanceToken';
-  const state={token:localStorage.getItem(TOKEN_KEY)||'',user:null,meta:null,dashboards:{},transactions:[],routines:[],page:'overall',charts:{},pendingPhoto:undefined,routineMode:localStorage.getItem('arRoutineMode')||'ALL',routineView:localStorage.getItem('arRoutineView')||'CARD'};
+  const CACHE_KEY='arFinanceCacheV14', TOKEN_KEY='arFinanceToken';
+  const state={token:localStorage.getItem(TOKEN_KEY)||'',user:null,meta:null,dashboards:{},transactions:[],routines:[],savings:null,page:'overall',charts:{},pendingPhoto:undefined,routineMode:localStorage.getItem('arRoutineMode')||'ALL',routineView:localStorage.getItem('arRoutineView')||'CARD'};
   const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
   const rupiah=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(n||0));
   const dateID=s=>s?new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(s+'T00:00:00')):'-';
@@ -33,11 +33,11 @@
   $('#studioPage').innerHTML=dashboardTemplate('STUDIO','AR Studio');
   $('#housePage').innerHTML=dashboardTemplate('HOUSE','Rumah Tangga');
 
-  function saveCache(){try{localStorage.setItem(CACHE_KEY,JSON.stringify({user:state.user,meta:state.meta,dashboards:state.dashboards,transactions:state.transactions,routines:state.routines,month:$('#monthFilter')?.value||String(currentMonth()),year:$('#yearFilter')?.value||String(currentYear())}));}catch(e){}}
+  function saveCache(){try{localStorage.setItem(CACHE_KEY,JSON.stringify({user:state.user,meta:state.meta,dashboards:state.dashboards,transactions:state.transactions,routines:state.routines,savings:state.savings,month:$('#monthFilter')?.value||String(currentMonth()),year:$('#yearFilter')?.value||String(currentYear())}));}catch(e){}}
   function loadCache(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||'null');}catch(e){return null;}}
   function applyData(data,fromCache=false){
     if(data.user)state.user=data.user;if(data.meta)state.meta=data.meta;if(data.dashboards)state.dashboards=data.dashboards;
-    if(data.transactions)state.transactions=data.transactions.transactions||[];if(data.routines)state.routines=data.routines||[];
+    if(data.transactions)state.transactions=data.transactions.transactions||[];if(data.routines)state.routines=data.routines||[];if(data.savings)state.savings=data.savings;
     if(!fromCache)saveCache();renderAll();
   }
 
@@ -56,7 +56,7 @@
   function fillFilters(cached){
     const m=$('#monthFilter');const months=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];m.innerHTML='<option value="ALL">Semua Bulan</option>'+months.map((x,i)=>`<option value="${i+1}">${x}</option>`).join('');m.value=String(cached?.month||currentMonth());
     const years=state.meta?.years?.length?state.meta.years:[currentYear()];$('#yearFilter').innerHTML=years.map(v=>`<option value="${v}">${v}</option>`).join('');$('#yearFilter').value=String(cached?.year||currentYear());
-    fillTransactionOptions();fillRoutineOptions();
+    fillTransactionOptions();fillRoutineOptions();fillSavingOptions();
   }
   function currentPeriod(){return {month:$('#monthFilter').value,year:$('#yearFilter').value};}
   async function refreshData(){
@@ -64,7 +64,7 @@
     try{const data=await api('sync',filters);applyData(data);}catch(e){if(/session|user tidak aktif|username berubah/i.test(e.message)){localStorage.removeItem(TOKEN_KEY);state.token='';showLogin();}toast(e.message,'error');}
   }
 
-  function renderAll(){applyUserVisuals();['ALL','HOUSE','STUDIO'].forEach(renderDashboard);renderTransactions();renderRoutines();renderAccounts();}
+  function renderAll(){applyUserVisuals();['ALL','HOUSE','STUDIO'].forEach(renderDashboard);renderTransactions();renderRoutines();renderSavings();renderAccounts();}
   function renderDashboard(key){
     const d=state.dashboards?.[key];if(!d)return;
     let cards;
@@ -112,6 +112,36 @@
     $('#routineTable').innerHTML=filtered.map(r=>`<tr class="${r.active?'':'inactive-row'}"><td><span class="status-badge ${r.paid?'paid':'unpaid'}">${r.paid?'Sudah Dibayar':'Belum Dibayar'}</span></td><td><strong>${esc(r.description)}</strong><div class="tiny muted">${esc(r.category)}</div></td><td><span class="payment-badge ${r.paymentMode==='CASH_ATM'?'cash':'online'}">${r.paymentMode==='CASH_ATM'?'Cash / ATM':'Online'}</span></td><td>Tgl ${r.dueDay}</td><td>${esc(r.fromAccount||'-')}</td><td class="align-right routine-table-amount">${rupiah(r.amount)}</td><td><div class="row-actions">${routineActions(r)}</div></td></tr>`).join('')||'<tr><td colspan="7">Tidak ada pengeluaran rutin pada filter ini.</td></tr>';
   }
 
+  function fillSavingOptions(){
+    const accts=(state.meta?.accounts||[]).filter(a=>a.book==='HOUSE'&&a.active);
+    const opts=accts.map(a=>`<option value="${esc(a.name)}">${esc(a.name)} · ${esc(a.type)}</option>`).join('');
+    if($('#savingFromAccount'))$('#savingFromAccount').innerHTML=opts;
+    if($('#savingToAccount'))$('#savingToAccount').innerHTML=opts;
+  }
+  function savingActions(p){return `${p.active&&p.remaining>0?`<button class="mini-btn transfer" data-transfer-saving="${p.id}">Transfer</button>`:''}<button class="mini-btn" data-edit-saving="${p.id}">Edit</button>${state.user?.role==='ADMIN'?`<button class="mini-btn" data-delete-saving="${p.id}">Hapus</button>`:''}`;}
+  function renderSavings(){
+    const d=state.savings;if(!d||!$('#savingFundCards'))return;
+    const pct=Math.min(100,Number(d.totalPercent||0));
+    $('#savingFundCards').innerHTML=`
+      <article class="saving-kpi primary"><span class="label">Sisa Dana Rumah Tangga</span><strong>${rupiah(d.baseAmount)}</strong><small>Pemasukan − pengeluaran bulan terpilih</small></article>
+      <article class="saving-kpi"><span class="label">Target Saving</span><strong>${rupiah(d.targetTotal)}</strong><small>${Number(d.totalPercent||0).toLocaleString('id-ID')}% dari sisa dana</small></article>
+      <article class="saving-kpi accent"><span class="label">Sudah Dipindahkan</span><strong>${rupiah(d.transferredTotal)}</strong><small>Transfer ke rekening saving bulan ini</small></article>
+      <article class="saving-kpi"><span class="label">Masih Harus Ditransfer</span><strong>${rupiah(d.remainingTotal)}</strong><small>Sisa tidak dialokasikan ${rupiah(d.unallocated)}</small></article>`;
+    $('#savingPercentBadge').innerHTML=`Total alokasi <b>${Number(d.totalPercent||0).toLocaleString('id-ID')}%</b>`;
+    const plans=d.plans||[];
+    $('#savingList').innerHTML=plans.map(p=>{const progress=p.target>0?Math.min(100,(p.transferred/p.target)*100):0;return `<div class="saving-row ${p.active?'':'inactive'}"><div><span class="saving-status ${p.remaining<=0&&p.target>0?'done':'pending'}">${p.remaining<=0&&p.target>0?'Terpenuhi':'Belum penuh'}</span><h4>${esc(p.name)}</h4><div class="tiny muted">${esc(p.fromAccount)} → ${esc(p.toAccount)}</div><div class="saving-progress"><span style="width:${progress}%"></span></div></div><div class="saving-pct">${Number(p.percent||0).toLocaleString('id-ID')}%</div><div class="saving-money"><small>Target</small><strong>${rupiah(p.target)}</strong></div><div class="saving-money"><small>Sudah / Sisa</small><strong>${rupiah(p.transferred)}</strong><small>Sisa ${rupiah(p.remaining)}</small></div><div class="saving-actions">${savingActions(p)}</div></div>`}).join('')||'<div class="saving-empty">Belum ada alokasi saving.</div>';
+    const targets=plans.filter(p=>p.active&&p.percent>0);
+    const accountMap={};targets.forEach(p=>{accountMap[p.toAccount]=(accountMap[p.toAccount]||0)+Number(p.remaining||0);});
+    $('#savingAccountInfo').innerHTML=Object.entries(accountMap).map(([name,val])=>`<div class="saving-account-line"><b>${esc(name)}</b><br><span class="muted">Perlu ditransfer ${rupiah(val)}</span></div>`).join('')||'<div class="saving-account-line muted">Belum ada rekening tujuan aktif.</div>';
+    if(typeof Chart!=='undefined'&&$('#savingChart')){if(state.charts.saving)state.charts.saving.destroy();const labels=targets.map(p=>p.name).concat(d.unallocated>0?['Sisa tidak dialokasikan']:[]);const values=targets.map(p=>p.target).concat(d.unallocated>0?[d.unallocated]:[]);state.charts.saving=new Chart($('#savingChart'),{type:'doughnut',data:{labels,datasets:[{data:values,borderWidth:3,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10}}},cutout:'64%'}});}
+  }
+  function openSaving(p=null){
+    $('#savingModalTitle').textContent=p?'Edit Alokasi Saving':'Tambah Alokasi Saving';$('#savingId').value=p?.id||'';$('#savingName').value=p?.name||'';$('#savingPercent').value=p?.percent??10;$('#savingActive').checked=p?!!p.active:true;$('#savingNote').value=p?.note||'';fillSavingOptions();$('#savingFromAccount').value=p?.fromAccount||'Rumah · Bank';$('#savingToAccount').value=p?.toAccount||'Rumah · Tabungan';$('#savingDialog').showModal();
+  }
+  async function saveSaving(){const d={id:$('#savingId').value,name:$('#savingName').value.trim(),percent:Number($('#savingPercent').value||0),fromAccount:$('#savingFromAccount').value,toAccount:$('#savingToAccount').value,active:$('#savingActive').checked,note:$('#savingNote').value.trim()};try{await api('saveSaving',d);$('#savingDialog').close();toast('Alokasi saving disimpan.');await refreshData();}catch(e){toast(e.message,'error');}}
+  async function transferSaving(id){const p=(state.savings?.plans||[]).find(x=>x.id===id);if(!p)return;const suggested=Math.max(0,Number(p.remaining||0));if(!(suggested>0)){toast('Target saving ini sudah terpenuhi.');return;}const raw=prompt(`Nominal transfer untuk ${p.name}:`,String(Math.round(suggested)));if(raw===null)return;const amount=Number(String(raw).replace(/[^0-9.-]/g,''));if(!(amount>0)){toast('Nominal tidak valid.','error');return;}const per=currentPeriod(),month=per.month==='ALL'?currentMonth():Number(per.month);try{await api('transferSaving',{id,amount,month,year:Number(per.year)});toast('Transfer saving dicatat.');await refreshData();}catch(e){toast(e.message,'error');}}
+  async function deleteSaving(id){if(!confirm('Hapus alokasi saving ini? Riwayat transfer yang sudah tercatat tidak ikut dihapus.'))return;try{await api('deleteSaving',{id});toast('Alokasi saving dihapus.');await refreshData();}catch(e){toast(e.message,'error');}}
+
   function fillTransactionOptions(){updateFormOptions();}
   function updateFormOptions(){const book=$('#txBook').value,type=$('#txType').value;const cats=(state.meta?.categories||[]).filter(c=>c.book===book&&(c.type===type||c.type==='ALL')&&c.active);$('#txCategory').innerHTML=cats.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')||'<option value="Lainnya">Lainnya</option>';const accts=(state.meta?.accounts||[]).filter(a=>a.book===book&&a.active);const opts='<option value="">— Tidak ada —</option>'+accts.map(a=>`<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('');$('#txFromAccount').innerHTML=opts;$('#txToAccount').innerHTML=opts;$('#transactionRuleHint').textContent={INCOME:'Pemasukan: pilih Akun Tujuan.',EXPENSE:'Pengeluaran: pilih Akun Asal.',TRANSFER:'Transfer: pilih Akun Asal dan Akun Tujuan.',PRIVE:'Prive: pilih Akun Asal Studio.'}[type]||'';}
   function openTransaction(tx=null){$('#transactionModalTitle').textContent=tx?'Edit Transaksi':'Tambah Transaksi';$('#txId').value=tx?.id||'';$('#txDate').value=tx?.date||today();$('#txBook').value=tx?.book||(state.page==='studio'?'STUDIO':'HOUSE');$('#txType').value=tx?.type||'EXPENSE';updateFormOptions();if(tx){$('#txCategory').value=tx.category;$('#txDescription').value=tx.description||'';$('#txParty').value=tx.party||'';$('#txMethod').value=tx.method||'Transfer';$('#txFromAccount').value=tx.fromAccount||'';$('#txToAccount').value=tx.toAccount||'';$('#txAmount').value=tx.amount||'';$('#txNote').value=tx.note||'';}else{$('#txDescription').value='';$('#txParty').value='';$('#txAmount').value='';$('#txNote').value='';}$('#transactionDialog').showModal();}
@@ -124,7 +154,7 @@
   async function payRoutine(id){const p=currentPeriod(),month=p.month==='ALL'?currentMonth():Number(p.month);if(!confirm(`Tandai pengeluaran ini sudah dibayar untuk ${month}/${p.year}?`))return;try{await api('payRoutine',{id,month,year:Number(p.year)});toast('Pembayaran dicatat sebagai pengeluaran Rumah Tangga.');await refreshData();}catch(e){toast(e.message,'error');}}
   async function deleteRoutine(id){if(!confirm('Hapus pengeluaran rutin ini?'))return;try{await api('deleteRoutine',{id});toast('Pengeluaran rutin dihapus.');await refreshData();}catch(e){toast(e.message,'error');}}
 
-  function switchPage(page){state.page=page;$$('.page').forEach(x=>x.classList.add('hidden'));$('#'+page+'Page').classList.remove('hidden');$$('.nav-link').forEach(x=>x.classList.toggle('active',x.dataset.page===page));const titles={overall:'Dashboard Keseluruhan',studio:'Dashboard AR Studio',house:'Dashboard Rumah Tangga',transactions:'Transaksi',routines:'Pengeluaran Rutin',accounts:'Akun & Saldo',profile:'Profil & Pengaturan'};$('#pageTitle').textContent=titles[page]||'AR Family Finance';$('#pageEyebrow').textContent=page==='studio'?'AR STUDIO':page==='house'||page==='routines'?'RUMAH TANGGA':page==='profile'?'AKUN':'RINGKASAN KEUANGAN';$('#financeFilters').classList.toggle('hidden',page==='profile'||page==='accounts');$('#sidebar').classList.remove('open');if(['overall','studio','house'].includes(page))setTimeout(()=>renderDashboard(page==='overall'?'ALL':page==='studio'?'STUDIO':'HOUSE'),0);}
+  function switchPage(page){state.page=page;$$('.page').forEach(x=>x.classList.add('hidden'));$('#'+page+'Page').classList.remove('hidden');$$('.nav-link').forEach(x=>x.classList.toggle('active',x.dataset.page===page));const titles={overall:'Dashboard Keseluruhan',studio:'Dashboard AR Studio',house:'Dashboard Rumah Tangga',transactions:'Transaksi',routines:'Pengeluaran Rutin',savings:'Saving / Tabungan',accounts:'Akun & Saldo',profile:'Profil & Pengaturan'};$('#pageTitle').textContent=titles[page]||'AR Family Finance';$('#pageEyebrow').textContent=page==='studio'?'AR STUDIO':page==='house'||page==='routines'||page==='savings'?'RUMAH TANGGA':page==='profile'?'AKUN':'RINGKASAN KEUANGAN';$('#financeFilters').classList.toggle('hidden',page==='profile'||page==='accounts');$('#sidebar').classList.remove('open');if(['overall','studio','house'].includes(page))setTimeout(()=>renderDashboard(page==='overall'?'ALL':page==='studio'?'STUDIO':'HOUSE'),0);}
 
   // Crop foto profil
   const crop={img:null,scale:1,base:1,x:0,y:0,drag:false,lastX:0,lastY:0};
@@ -144,13 +174,15 @@
   $('#routineGrid').addEventListener('click',handleRoutineAction);$('#routineTable').addEventListener('click',handleRoutineAction);
   $('#routineModeFilter').addEventListener('click',e=>{const b=e.target.closest('[data-routine-mode]');if(!b)return;state.routineMode=b.dataset.routineMode;localStorage.setItem('arRoutineMode',state.routineMode);renderRoutines();});
   $('#routineViewToggle').addEventListener('click',e=>{const b=e.target.closest('[data-routine-view]');if(!b)return;state.routineView=b.dataset.routineView;localStorage.setItem('arRoutineView',state.routineView);renderRoutines();});
+  $('#addSavingBtn').addEventListener('click',()=>openSaving());$('#closeSavingBtn').addEventListener('click',()=>$('#savingDialog').close());$('#cancelSavingBtn').addEventListener('click',()=>$('#savingDialog').close());$('#savingForm').addEventListener('submit',e=>{e.preventDefault();saveSaving();});
+  $('#savingList').addEventListener('click',e=>{const tr=e.target.closest('[data-transfer-saving]'),ed=e.target.closest('[data-edit-saving]'),del=e.target.closest('[data-delete-saving]');if(tr)transferSaving(tr.dataset.transferSaving);if(ed){const p=(state.savings?.plans||[]).find(x=>x.id===ed.dataset.editSaving);if(p)openSaving(p);}if(del)deleteSaving(del.dataset.deleteSaving);});
   $('#profileForm').addEventListener('submit',e=>{e.preventDefault();saveProfile();});$('#changePhotoBtn').addEventListener('click',()=>$('#photoInput').click());$('#photoInput').addEventListener('change',e=>{if(e.target.files?.[0])openPhoto(e.target.files[0]);e.target.value='';});$('#closeCropBtn').addEventListener('click',()=>$('#cropDialog').close());$('#cancelCropBtn').addEventListener('click',()=>$('#cropDialog').close());$('#cropZoom').addEventListener('input',e=>{crop.scale=Number(e.target.value);drawCrop();});
   const cc=$('#cropCanvas');cc.addEventListener('pointerdown',e=>{crop.drag=true;crop.lastX=e.clientX;crop.lastY=e.clientY;cc.setPointerCapture(e.pointerId);});cc.addEventListener('pointermove',e=>{if(!crop.drag)return;crop.x+=e.clientX-crop.lastX;crop.y+=e.clientY-crop.lastY;crop.lastX=e.clientX;crop.lastY=e.clientY;drawCrop();});cc.addEventListener('pointerup',()=>crop.drag=false);$('#saveCropBtn').addEventListener('click',()=>{state.pendingPhoto=makePhotoData();const pp=$('#profilePhotoPreview');pp.textContent='';pp.style.backgroundImage=`url(${state.pendingPhoto})`;$('#cropDialog').close();toast('Crop siap. Klik Simpan Profil.');});
 
   (async()=>{
     if(!state.token){showLogin();return;}
     const cached=loadCache();
-    if(cached){state.user=cached.user;state.meta=cached.meta;state.dashboards=cached.dashboards||{};state.transactions=cached.transactions||[];state.routines=cached.routines||[];fillFilters(cached);showApp();renderAll();}
+    if(cached){state.user=cached.user;state.meta=cached.meta;state.dashboards=cached.dashboards||{};state.transactions=cached.transactions||[];state.routines=cached.routines||[];state.savings=cached.savings||null;fillFilters(cached);showApp();renderAll();}
     try{const data=await api('initialData',{book:'ALL',month:cached?.month||currentMonth(),year:cached?.year||currentYear()});applyData(data);fillFilters(cached||{month:currentMonth(),year:currentYear()});showApp();switchPage(state.page);}catch(e){localStorage.removeItem(TOKEN_KEY);state.token='';showLogin();toast('Silakan login kembali.','error');}
   })();
 })();

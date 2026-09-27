@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
   <title>AR Family Finance</title>
-  <link rel="stylesheet" href="styles.css?v=1.3.0" />
+  <link rel="stylesheet" href="styles.css?v=1.4.0" />
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -33,6 +33,7 @@
         <p class="nav-group">KEUANGAN</p>
         <button class="nav-link" data-page="transactions"><span>↕</span> Transaksi</button>
         <button class="nav-link" data-page="routines"><span>↻</span> Pengeluaran Rutin</button>
+        <button class="nav-link" data-page="savings"><span>◇</span> Saving / Tabungan</button>
         <button class="nav-link" data-page="accounts"><span>◫</span> Akun & Saldo</button>
         <p class="nav-group">AKUN</p>
         <button class="nav-link" data-page="profile"><span>◎</span> Profil</button>
@@ -89,6 +90,16 @@
         </div>
       </section>
 
+
+      <section id="savingsPage" class="page hidden">
+        <div class="section-toolbar"><div><p class="eyebrow">RUMAH TANGGA</p><h3>Saving & Alokasi Sisa Dana</h3><p class="muted small-text">Atur persentase saving dari sisa pemasukan Rumah Tangga. Transfer ke rekening tabungan dicatat sebagai transfer antar rekening, bukan pengeluaran.</p></div><button id="addSavingBtn" class="btn primary">+ Alokasi Saving</button></div>
+        <div id="savingFundCards" class="saving-kpi-grid"></div>
+        <div class="saving-layout">
+          <article class="panel span-2"><div class="panel-head"><div><p class="eyebrow">ALOKASI BULANAN</p><h3>Rencana Saving</h3></div><div id="savingPercentBadge" class="summary-pill"></div></div><div id="savingList" class="saving-list"></div></article>
+          <article class="panel"><div class="panel-head"><div><p class="eyebrow">KOMPOSISI</p><h3>Persentase Saving</h3></div></div><div class="chart-wrap saving-chart-wrap"><canvas id="savingChart"></canvas></div><div id="savingAccountInfo" class="saving-account-info"></div></article>
+        </div>
+      </section>
+
       <section id="accountsPage" class="page hidden">
         <div class="content-grid"><article class="panel span-2"><div class="panel-head"><div><p class="eyebrow">SALDO BERJALAN</p><h3>Rekening & Kas</h3></div></div><div id="accountCards" class="account-card-grid"></div></article><article class="panel"><div class="panel-head"><div><p class="eyebrow">ATURAN</p><h3>Pencatatan</h3></div></div><div class="rules"><p><b>Pemasukan</b> → akun tujuan.</p><p><b>Pengeluaran / prive</b> → akun asal.</p><p><b>Transfer</b> → akun asal + tujuan.</p><p><b>Tarik ATM</b> → Bank ke Tunai, bukan pengeluaran.</p></div></article></div>
       </section>
@@ -106,11 +117,14 @@
 
   <dialog id="routineDialog" class="modal"><form id="routineForm" method="dialog"><div class="modal-head"><div><p class="eyebrow">RUMAH TANGGA</p><h3 id="routineModalTitle">Pengeluaran Rutin</h3></div><button type="button" class="icon-btn" id="closeRoutineBtn">×</button></div><input type="hidden" id="routineId" /><div class="form-grid"><label class="span-2">Nama Tagihan / Pengeluaran<input id="routineDescription" required placeholder="Contoh: Listrik, sekolah, internet" /></label><label>Kategori<select id="routineCategory"></select></label><label>Nominal / bulan<input id="routineAmount" type="number" min="0" required /></label><label>Metode Bayar<select id="routinePaymentMode"><option value="ONLINE">Online / Bank</option><option value="CASH_ATM">Cash / ATM</option></select></label><label>Tanggal Jatuh Tempo<input id="routineDueDay" type="number" min="1" max="31" value="1" /></label><label class="span-2">Akun Pembayaran<select id="routineFromAccount"></select></label><label class="span-2 check-label"><input id="routineActive" type="checkbox" checked /> Aktif setiap bulan</label><label class="span-2">Catatan<textarea id="routineNote" rows="3"></textarea></label></div><div class="modal-actions"><button type="button" class="btn ghost" id="cancelRoutineBtn">Batal</button><button class="btn primary" type="submit">Simpan</button></div></form></dialog>
 
+
+  <dialog id="savingDialog" class="modal"><form id="savingForm" method="dialog"><div class="modal-head"><div><p class="eyebrow">SAVING</p><h3 id="savingModalTitle">Alokasi Saving</h3></div><button type="button" class="icon-btn" id="closeSavingBtn">×</button></div><input type="hidden" id="savingId" /><div class="form-grid"><label class="span-2">Nama Alokasi<input id="savingName" required placeholder="Contoh: Pendidikan, Investasi, Liburan" /></label><label>Persentase dari sisa dana<input id="savingPercent" type="number" min="0" max="100" step="0.1" required /></label><label class="check-label"><input id="savingActive" type="checkbox" checked /> Aktif</label><label>Rekening Asal<select id="savingFromAccount"></select></label><label>Rekening Tujuan<select id="savingToAccount"></select></label><label class="span-2">Catatan<textarea id="savingNote" rows="3"></textarea></label></div><div class="hint">Nominal target dihitung otomatis dari sisa pemasukan Rumah Tangga pada bulan terpilih × persentase.</div><div class="modal-actions"><button type="button" class="btn ghost" id="cancelSavingBtn">Batal</button><button class="btn primary" type="submit">Simpan</button></div></form></dialog>
+
   <dialog id="cropDialog" class="modal crop-modal"><div class="modal-head"><div><p class="eyebrow">FOTO PROFIL</p><h3>Crop Foto</h3></div><button type="button" class="icon-btn" id="closeCropBtn">×</button></div><div class="crop-stage"><canvas id="cropCanvas" width="320" height="320"></canvas></div><label>Zoom<input id="cropZoom" type="range" min="1" max="3" step="0.01" value="1" /></label><p class="tiny muted">Geser foto dengan mouse atau jari untuk mengatur posisi.</p><div class="modal-actions"><button id="cancelCropBtn" class="btn ghost" type="button">Batal</button><button id="saveCropBtn" class="btn primary" type="button">Pakai Foto</button></div></dialog>
   <input id="photoInput" type="file" accept="image/*" hidden />
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script src="config.js?v=1.3.0"></script>
-  <script src="app.js?v=1.3.0"></script>
+  <script src="config.js?v=1.4.0"></script>
+  <script src="app.js?v=1.4.0"></script>
 </body>
 </html>
