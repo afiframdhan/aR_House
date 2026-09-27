@@ -1,4 +1,10 @@
-# AR Family Finance v1.2
+# AR Family Finance
+
+## Patch v1.2.1 — Login / Action tidak dikenal
+Jika muncul pesan **Action tidak dikenal** setelah menekan Masuk, berarti browser/GitHub Pages masih memakai JavaScript versi sebelumnya sementara Apps Script sudah memakai backend baru, atau sebaliknya. Patch ini menambahkan kompatibilitas action `session`, `validateSession`, dan alias login lama, serta query version pada file frontend agar cache browser diperbarui.
+
+Untuk update dari v1.2: ganti `Code.gs`, `index.html`, dan sebaiknya semua file frontend; lalu redeploy Apps Script sebagai **New version**.
+ v1.2
 
 Frontend: GitHub Pages  
 Backend: Google Apps Script Web App  

@@ -14,7 +14,7 @@ const HEADERS = {
 };
 
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ok:true,service:'AR Family Finance API',version:'1.2'})).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ok:true,service:'AR Family Finance API',version:'1.2.1'})).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
@@ -41,8 +41,19 @@ function doPost(e) {
 }
 
 function route_(action, token, data) {
+  action = String(action || '').trim();
+  const aliases = {
+    'auth.login':'login',
+    'auth.logout':'logout',
+    'validateSession':'session',
+    'sessionCheck':'session'
+  };
+  action = aliases[action] || action;
+
   if (action === 'login') return login_(data);
   if (action === 'logout') return logout_(token);
+  if (action === 'session') return { user: requireSession_(token) };
+
   const user = requireSession_(token);
   if (action === 'initialData' || action === 'sync') return appData_(data, user);
   if (action === 'bootstrap') return bootstrap_(user);
