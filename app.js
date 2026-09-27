@@ -1,8 +1,8 @@
 (() => {
   'use strict';
   const API_URL = window.AR_FINANCE_CONFIG?.API_URL || '';
-  const CACHE_KEY='arFinanceCacheV14', TOKEN_KEY='arFinanceToken';
-  const state={token:localStorage.getItem(TOKEN_KEY)||'',user:null,meta:null,dashboards:{},transactions:[],routines:[],savings:null,page:'overall',charts:{},pendingPhoto:undefined,routineMode:localStorage.getItem('arRoutineMode')||'ALL',routineView:localStorage.getItem('arRoutineView')||'CARD'};
+  const CACHE_KEY='arFinanceCacheV15', TOKEN_KEY='arFinanceToken';
+  const state={token:localStorage.getItem(TOKEN_KEY)||'',user:null,meta:null,dashboards:{},transactions:[],routines:[],savings:null,page:'overall',charts:{},pendingPhoto:undefined,routineMode:localStorage.getItem('arRoutineMode')||'ALL',routineView:localStorage.getItem('arRoutineView')||'CARD',categoryBook:'ALL',categoryType:'ALL'};
   const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
   const rupiah=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(n||0));
   const dateID=s=>s?new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(s+'T00:00:00')):'-';
@@ -14,6 +14,24 @@
   function toast(msg,type='ok'){const el=$('#toast');el.textContent=msg;el.className='toast show'+(type==='error'?' error':'');clearTimeout(el._t);el._t=setTimeout(()=>el.className='toast',2700);}
   function esc(s=''){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
   function typeLabel(t){return ({INCOME:'Pemasukan',EXPENSE:'Pengeluaran',TRANSFER:'Transfer',PRIVE:'Prive'})[t]||t;}
+
+  const chartPalette=['#2563eb','#16a34a','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#eab308','#ec4899','#14b8a6','#6366f1'];
+  const fixedChartColors={
+    'belanja dapur':'#16a34a','tagihan rumah':'#2563eb','transportasi':'#f59e0b','pendidikan':'#8b5cf6','kesehatan':'#ef4444','makan di luar':'#f97316','cicilan':'#6366f1','hiburan':'#ec4899','internet & telepon':'#06b6d4','listrik':'#eab308','air':'#14b8a6','iuran':'#84cc16','lainnya':'#64748b',
+    'saving':'#2563eb','investasi':'#16a34a','jajan & jalan-jalan':'#f97316','jajan & jalan jalan':'#f97316','sedekah':'#8b5cf6','sisa tidak dialokasikan':'#94a3b8'
+  };
+  function normalizeChartLabel(label=''){return String(label).trim().toLowerCase().replace(/\s+/g,' ');}
+  function colorForLabel(label='',book='',type='EXPENSE'){
+    const custom=(state.meta?.categories||[]).find(c=>normalizeChartLabel(c.name)===normalizeChartLabel(label)&&(!book||c.book===book)&&(!type||c.type===type));
+    if(custom?.color&&/^#[0-9a-f]{6}$/i.test(custom.color))return custom.color;
+    const key=normalizeChartLabel(label);if(fixedChartColors[key])return fixedChartColors[key];
+    let h=0;for(let i=0;i<key.length;i++)h=((h<<5)-h)+key.charCodeAt(i);return chartPalette[Math.abs(h)%chartPalette.length];
+  }
+  function getChartColors(labels=[],book='',type='EXPENSE'){return labels.map(label=>colorForLabel(label,book,type));}
+  function renderChartLegend(el,labels,values,colors){
+    if(!el)return;const total=values.reduce((a,v)=>a+Number(v||0),0);
+    el.innerHTML=labels.map((label,i)=>{const val=Number(values[i]||0),pct=total>0?(val/total*100):0;return `<div class="chart-legend-item"><span class="chart-dot" style="background:${colors[i]}"></span><span class="chart-legend-name">${esc(label)}</span><strong>${rupiah(val)}</strong><small>${pct.toLocaleString('id-ID',{maximumFractionDigits:1})}%</small></div>`;}).join('');
+  }
 
   window.addEventListener('message',e=>{const d=e.data;if(!d||d.source!=='ar-finance-bridge'||!d.requestId)return;const p=pending.get(d.requestId);if(!p)return;pending.delete(d.requestId);p.cleanup();d.ok?p.resolve(d.data):p.reject(new Error(d.error||'API error'));});
   function api(action,data={}){
@@ -28,7 +46,7 @@
     });
   }
 
-  function dashboardTemplate(key,title){return `<div class="kpi-grid" id="kpi-${key}"></div><div class="chart-grid"><article class="panel span-2"><div class="panel-head"><div><p class="eyebrow">12 BULAN</p><h3>Arus Kas ${title}</h3></div></div><div class="chart-wrap"><canvas id="trend-${key}"></canvas></div></article><article class="panel"><div class="panel-head"><div><p class="eyebrow">KATEGORI</p><h3>Pengeluaran</h3></div></div><div class="chart-wrap"><canvas id="cat-${key}"></canvas></div></article></div><div class="content-grid"><article class="panel"><div class="panel-head"><div><p class="eyebrow">SALDO</p><h3>Akun</h3></div></div><div id="balances-${key}" class="account-list"></div></article><article class="panel span-2"><div class="panel-head"><div><p class="eyebrow">TERBARU</p><h3>Transaksi Terakhir</h3></div><button class="text-btn" data-go="transactions">Lihat semua</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Buku</th><th>Jenis</th><th>Uraian</th><th>Nominal</th></tr></thead><tbody id="recent-${key}"></tbody></table></div></article></div>`;}
+  function dashboardTemplate(key,title){return `<div class="kpi-grid" id="kpi-${key}"></div><div class="chart-grid"><article class="panel span-2"><div class="panel-head"><div><p class="eyebrow">12 BULAN</p><h3>Arus Kas ${title}</h3></div></div><div class="chart-wrap"><canvas id="trend-${key}"></canvas></div></article><article class="panel"><div class="panel-head"><div><p class="eyebrow">KATEGORI</p><h3>Pengeluaran</h3></div></div><div class="chart-wrap"><canvas id="cat-${key}"></canvas></div><div id="catLegend-${key}" class="chart-legend-list"></div></article></div><div class="content-grid"><article class="panel"><div class="panel-head"><div><p class="eyebrow">SALDO</p><h3>Akun</h3></div></div><div id="balances-${key}" class="account-list"></div></article><article class="panel span-2"><div class="panel-head"><div><p class="eyebrow">TERBARU</p><h3>Transaksi Terakhir</h3></div><button class="text-btn" data-go="transactions">Lihat semua</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Buku</th><th>Jenis</th><th>Uraian</th><th>Nominal</th></tr></thead><tbody id="recent-${key}"></tbody></table></div></article></div>`;}
   $('#overallPage').innerHTML=dashboardTemplate('ALL','Keseluruhan');
   $('#studioPage').innerHTML=dashboardTemplate('STUDIO','AR Studio');
   $('#housePage').innerHTML=dashboardTemplate('HOUSE','Rumah Tangga');
@@ -64,7 +82,7 @@
     try{const data=await api('sync',filters);applyData(data);}catch(e){if(/session|user tidak aktif|username berubah/i.test(e.message)){localStorage.removeItem(TOKEN_KEY);state.token='';showLogin();}toast(e.message,'error');}
   }
 
-  function renderAll(){applyUserVisuals();['ALL','HOUSE','STUDIO'].forEach(renderDashboard);renderTransactions();renderRoutines();renderSavings();renderAccounts();}
+  function renderAll(){applyUserVisuals();['ALL','HOUSE','STUDIO'].forEach(renderDashboard);renderTransactions();renderRoutines();renderSavings();renderAccounts();renderCategories();}
   function renderDashboard(key){
     const d=state.dashboards?.[key];if(!d)return;
     let cards;
@@ -79,7 +97,9 @@
   function drawCharts(key,d){
     if(typeof Chart==='undefined')return;if(state.charts['trend'+key])state.charts['trend'+key].destroy();if(state.charts['cat'+key])state.charts['cat'+key].destroy();
     state.charts['trend'+key]=new Chart($(`#trend-${key}`),{type:'bar',data:{labels:d.trend.map(x=>x.label),datasets:[{label:'Pemasukan',data:d.trend.map(x=>x.income),borderWidth:0,borderRadius:6},{label:'Pengeluaran',data:d.trend.map(x=>x.expense),borderWidth:0,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'bottom'}},scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>new Intl.NumberFormat('id-ID',{notation:'compact'}).format(v)}}}}});
-    state.charts['cat'+key]=new Chart($(`#cat-${key}`),{type:'doughnut',data:{labels:d.categories.map(x=>x.name),datasets:[{data:d.categories.map(x=>x.amount),borderWidth:3,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10}}},cutout:'68%'}});
+    const catLabels=d.categories.map(x=>x.name);const catValues=d.categories.map(x=>x.amount);const catColors=d.categories.map(x=>x.color||colorForLabel(x.name,key==='ALL'?'':key,'EXPENSE'));
+    state.charts['cat'+key]=new Chart($(`#cat-${key}`),{type:'doughnut',data:{labels:catLabels,datasets:[{data:catValues,backgroundColor:catColors,hoverBackgroundColor:catColors,borderWidth:3,borderColor:'#fff',hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${rupiah(ctx.raw)}`}}},cutout:'68%'}});
+    renderChartLegend($(`#catLegend-${key}`),catLabels,catValues,catColors);
   }
 
   function renderTransactions(){const q=($('#transactionSearch')?.value||'').toLowerCase(),type=$('#typeFilter')?.value||'ALL',book=$('#bookFilter')?.value||'ALL';const txs=state.transactions.filter(t=>(type==='ALL'||t.type===type)&&(book==='ALL'||t.book===book)&&(!q||[t.description,t.category,t.party,t.note].join(' ').toLowerCase().includes(q)));$('#transactionsTable').innerHTML=txs.map(tx=>`<tr><td>${dateID(tx.date)}</td><td><span class="badge ${tx.book}">${tx.book==='HOUSE'?'Rumah':'Studio'}</span></td><td>${typeLabel(tx.type)}</td><td>${esc(tx.category)}</td><td>${esc(tx.description)}</td><td>${esc(tx.fromAccount||tx.toAccount||'-')}</td><td class="money ${tx.type.toLowerCase()}">${rupiah(tx.amount)}</td><td><div class="row-actions"><button class="mini-btn" data-edit="${tx.id}">Edit</button>${state.user?.role==='ADMIN'?`<button class="mini-btn" data-delete="${tx.id}">Hapus</button>`:''}</div></td></tr>`).join('')||'<tr><td colspan="8">Tidak ada transaksi.</td></tr>';}
@@ -133,7 +153,7 @@
     const targets=plans.filter(p=>p.active&&p.percent>0);
     const accountMap={};targets.forEach(p=>{accountMap[p.toAccount]=(accountMap[p.toAccount]||0)+Number(p.remaining||0);});
     $('#savingAccountInfo').innerHTML=Object.entries(accountMap).map(([name,val])=>`<div class="saving-account-line"><b>${esc(name)}</b><br><span class="muted">Perlu ditransfer ${rupiah(val)}</span></div>`).join('')||'<div class="saving-account-line muted">Belum ada rekening tujuan aktif.</div>';
-    if(typeof Chart!=='undefined'&&$('#savingChart')){if(state.charts.saving)state.charts.saving.destroy();const labels=targets.map(p=>p.name).concat(d.unallocated>0?['Sisa tidak dialokasikan']:[]);const values=targets.map(p=>p.target).concat(d.unallocated>0?[d.unallocated]:[]);state.charts.saving=new Chart($('#savingChart'),{type:'doughnut',data:{labels,datasets:[{data:values,borderWidth:3,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10}}},cutout:'64%'}});}
+    if(typeof Chart!=='undefined'&&$('#savingChart')){if(state.charts.saving)state.charts.saving.destroy();const labels=targets.map(p=>p.name).concat(d.unallocated>0?['Sisa tidak dialokasikan']:[]);const values=targets.map(p=>p.target).concat(d.unallocated>0?[d.unallocated]:[]);const savingColors=getChartColors(labels);state.charts.saving=new Chart($('#savingChart'),{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:savingColors,hoverBackgroundColor:savingColors,borderWidth:3,borderColor:'#fff',hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${rupiah(ctx.raw)}`}}},cutout:'64%'}});renderChartLegend($('#savingLegend'),labels,values,savingColors);}
   }
   function openSaving(p=null){
     $('#savingModalTitle').textContent=p?'Edit Alokasi Saving':'Tambah Alokasi Saving';$('#savingId').value=p?.id||'';$('#savingName').value=p?.name||'';$('#savingPercent').value=p?.percent??10;$('#savingActive').checked=p?!!p.active:true;$('#savingNote').value=p?.note||'';fillSavingOptions();$('#savingFromAccount').value=p?.fromAccount||'Rumah · Bank';$('#savingToAccount').value=p?.toAccount||'Rumah · Tabungan';$('#savingDialog').showModal();
@@ -141,6 +161,28 @@
   async function saveSaving(){const d={id:$('#savingId').value,name:$('#savingName').value.trim(),percent:Number($('#savingPercent').value||0),fromAccount:$('#savingFromAccount').value,toAccount:$('#savingToAccount').value,active:$('#savingActive').checked,note:$('#savingNote').value.trim()};try{await api('saveSaving',d);$('#savingDialog').close();toast('Alokasi saving disimpan.');await refreshData();}catch(e){toast(e.message,'error');}}
   async function transferSaving(id){const p=(state.savings?.plans||[]).find(x=>x.id===id);if(!p)return;const suggested=Math.max(0,Number(p.remaining||0));if(!(suggested>0)){toast('Target saving ini sudah terpenuhi.');return;}const raw=prompt(`Nominal transfer untuk ${p.name}:`,String(Math.round(suggested)));if(raw===null)return;const amount=Number(String(raw).replace(/[^0-9.-]/g,''));if(!(amount>0)){toast('Nominal tidak valid.','error');return;}const per=currentPeriod(),month=per.month==='ALL'?currentMonth():Number(per.month);try{await api('transferSaving',{id,amount,month,year:Number(per.year)});toast('Transfer saving dicatat.');await refreshData();}catch(e){toast(e.message,'error');}}
   async function deleteSaving(id){if(!confirm('Hapus alokasi saving ini? Riwayat transfer yang sudah tercatat tidak ikut dihapus.'))return;try{await api('deleteSaving',{id});toast('Alokasi saving dihapus.');await refreshData();}catch(e){toast(e.message,'error');}}
+
+  function renderCategories(){
+    const table=$('#categoriesTable');if(!table)return;
+    const cats=(state.meta?.categories||[]).filter(c=>(state.categoryBook==='ALL'||c.book===state.categoryBook)&&(state.categoryType==='ALL'||c.type===state.categoryType));
+    $$('#categoryBookFilter [data-category-book]').forEach(b=>b.classList.toggle('active',b.dataset.categoryBook===state.categoryBook));
+    if($('#categoryTypeFilter'))$('#categoryTypeFilter').value=state.categoryType;
+    if($('#addCategoryBtn'))$('#addCategoryBtn').classList.toggle('hidden',state.user?.role!=='ADMIN');
+    table.innerHTML=cats.map(c=>`<tr><td><span class="category-color-dot" style="background:${esc(c.color||colorForLabel(c.name,c.book,c.type))}"></span><code class="color-code">${esc(c.color||colorForLabel(c.name,c.book,c.type))}</code></td><td><strong>${esc(c.name)}</strong></td><td><span class="badge ${c.book}">${c.book==='HOUSE'?'Rumah':'Studio'}</span></td><td>${typeLabel(c.type)}</td><td><span class="category-status ${c.active?'active':'inactive'}">${c.active?'Aktif':'Nonaktif'}</span></td><td><div class="row-actions">${state.user?.role==='ADMIN'?`<button class="mini-btn" data-edit-category="${c.id}">Edit</button><button class="mini-btn danger" data-delete-category="${c.id}">Hapus</button>`:'-'}</div></td></tr>`).join('')||'<tr><td colspan="6">Belum ada kategori pada filter ini.</td></tr>';
+  }
+  function openCategory(c=null){
+    if(state.user?.role!=='ADMIN'){toast('Hanya Administrator yang dapat mengubah kategori.','error');return;}
+    $('#categoryModalTitle').textContent=c?'Edit Kategori':'Tambah Kategori';$('#categoryId').value=c?.id||'';$('#categoryBook').value=c?.book||'HOUSE';$('#categoryType').value=c?.type||'EXPENSE';$('#categoryName').value=c?.name||'';const color=c?.color||'#2563eb';$('#categoryColor').value=color;$('#categoryColorHex').value=color;$('#categoryActive').checked=c?!!c.active:true;$('#categoryDialog').showModal();
+  }
+  async function saveCategory(){
+    const d={id:$('#categoryId').value,book:$('#categoryBook').value,type:$('#categoryType').value,name:$('#categoryName').value.trim(),color:$('#categoryColorHex').value.trim(),active:$('#categoryActive').checked};
+    try{await api('saveCategory',d);$('#categoryDialog').close();toast('Kategori disimpan.');await refreshData();}catch(e){toast(e.message,'error');}
+  }
+  async function deleteCategory(id){
+    const c=(state.meta?.categories||[]).find(x=>x.id===id);if(!c)return;
+    if(!confirm(`Hapus kategori "${c.name}"?\n\nRiwayat transaksi lama tidak akan dihapus, tetapi kategori ini tidak lagi tersedia untuk transaksi baru.`))return;
+    try{await api('deleteCategory',{id});toast('Kategori dihapus.');await refreshData();}catch(e){toast(e.message,'error');}
+  }
 
   function fillTransactionOptions(){updateFormOptions();}
   function updateFormOptions(){const book=$('#txBook').value,type=$('#txType').value;const cats=(state.meta?.categories||[]).filter(c=>c.book===book&&(c.type===type||c.type==='ALL')&&c.active);$('#txCategory').innerHTML=cats.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')||'<option value="Lainnya">Lainnya</option>';const accts=(state.meta?.accounts||[]).filter(a=>a.book===book&&a.active);const opts='<option value="">— Tidak ada —</option>'+accts.map(a=>`<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('');$('#txFromAccount').innerHTML=opts;$('#txToAccount').innerHTML=opts;$('#transactionRuleHint').textContent={INCOME:'Pemasukan: pilih Akun Tujuan.',EXPENSE:'Pengeluaran: pilih Akun Asal.',TRANSFER:'Transfer: pilih Akun Asal dan Akun Tujuan.',PRIVE:'Prive: pilih Akun Asal Studio.'}[type]||'';}
@@ -154,7 +196,7 @@
   async function payRoutine(id){const p=currentPeriod(),month=p.month==='ALL'?currentMonth():Number(p.month);if(!confirm(`Tandai pengeluaran ini sudah dibayar untuk ${month}/${p.year}?`))return;try{await api('payRoutine',{id,month,year:Number(p.year)});toast('Pembayaran dicatat sebagai pengeluaran Rumah Tangga.');await refreshData();}catch(e){toast(e.message,'error');}}
   async function deleteRoutine(id){if(!confirm('Hapus pengeluaran rutin ini?'))return;try{await api('deleteRoutine',{id});toast('Pengeluaran rutin dihapus.');await refreshData();}catch(e){toast(e.message,'error');}}
 
-  function switchPage(page){state.page=page;$$('.page').forEach(x=>x.classList.add('hidden'));$('#'+page+'Page').classList.remove('hidden');$$('.nav-link').forEach(x=>x.classList.toggle('active',x.dataset.page===page));const titles={overall:'Dashboard Keseluruhan',studio:'Dashboard AR Studio',house:'Dashboard Rumah Tangga',transactions:'Transaksi',routines:'Pengeluaran Rutin',savings:'Saving / Tabungan',accounts:'Akun & Saldo',profile:'Profil & Pengaturan'};$('#pageTitle').textContent=titles[page]||'AR Family Finance';$('#pageEyebrow').textContent=page==='studio'?'AR STUDIO':page==='house'||page==='routines'||page==='savings'?'RUMAH TANGGA':page==='profile'?'AKUN':'RINGKASAN KEUANGAN';$('#financeFilters').classList.toggle('hidden',page==='profile'||page==='accounts');$('#sidebar').classList.remove('open');if(['overall','studio','house'].includes(page))setTimeout(()=>renderDashboard(page==='overall'?'ALL':page==='studio'?'STUDIO':'HOUSE'),0);}
+  function switchPage(page){state.page=page;$$('.page').forEach(x=>x.classList.add('hidden'));$('#'+page+'Page').classList.remove('hidden');$$('.nav-link').forEach(x=>x.classList.toggle('active',x.dataset.page===page));const titles={overall:'Dashboard Keseluruhan',studio:'Dashboard AR Studio',house:'Dashboard Rumah Tangga',transactions:'Transaksi',routines:'Pengeluaran Rutin',savings:'Saving / Tabungan',accounts:'Akun & Saldo',categories:'Kategori',profile:'Profil & Pengaturan'};$('#pageTitle').textContent=titles[page]||'AR Family Finance';$('#pageEyebrow').textContent=page==='studio'?'AR STUDIO':page==='house'||page==='routines'||page==='savings'?'RUMAH TANGGA':page==='profile'?'AKUN':page==='categories'?'PENGATURAN':'RINGKASAN KEUANGAN';$('#financeFilters').classList.toggle('hidden',page==='profile'||page==='accounts'||page==='categories');$('#sidebar').classList.remove('open');if(['overall','studio','house'].includes(page))setTimeout(()=>renderDashboard(page==='overall'?'ALL':page==='studio'?'STUDIO':'HOUSE'),0);}
 
   // Crop foto profil
   const crop={img:null,scale:1,base:1,x:0,y:0,drag:false,lastX:0,lastY:0};
@@ -176,6 +218,11 @@
   $('#routineViewToggle').addEventListener('click',e=>{const b=e.target.closest('[data-routine-view]');if(!b)return;state.routineView=b.dataset.routineView;localStorage.setItem('arRoutineView',state.routineView);renderRoutines();});
   $('#addSavingBtn').addEventListener('click',()=>openSaving());$('#closeSavingBtn').addEventListener('click',()=>$('#savingDialog').close());$('#cancelSavingBtn').addEventListener('click',()=>$('#savingDialog').close());$('#savingForm').addEventListener('submit',e=>{e.preventDefault();saveSaving();});
   $('#savingList').addEventListener('click',e=>{const tr=e.target.closest('[data-transfer-saving]'),ed=e.target.closest('[data-edit-saving]'),del=e.target.closest('[data-delete-saving]');if(tr)transferSaving(tr.dataset.transferSaving);if(ed){const p=(state.savings?.plans||[]).find(x=>x.id===ed.dataset.editSaving);if(p)openSaving(p);}if(del)deleteSaving(del.dataset.deleteSaving);});
+  $('#addCategoryBtn').addEventListener('click',()=>openCategory());
+  $('#closeCategoryBtn').addEventListener('click',()=>$('#categoryDialog').close());$('#cancelCategoryBtn').addEventListener('click',()=>$('#categoryDialog').close());$('#categoryForm').addEventListener('submit',e=>{e.preventDefault();saveCategory();});
+  $('#categoryColor').addEventListener('input',e=>$('#categoryColorHex').value=e.target.value.toLowerCase());$('#categoryColorHex').addEventListener('input',e=>{const v=e.target.value.trim();if(/^#[0-9a-f]{6}$/i.test(v))$('#categoryColor').value=v;});
+  $('#categoryBookFilter').addEventListener('click',e=>{const b=e.target.closest('[data-category-book]');if(!b)return;state.categoryBook=b.dataset.categoryBook;renderCategories();});$('#categoryTypeFilter').addEventListener('change',e=>{state.categoryType=e.target.value;renderCategories();});
+  $('#categoriesTable').addEventListener('click',e=>{const ed=e.target.closest('[data-edit-category]'),del=e.target.closest('[data-delete-category]');if(ed){const c=(state.meta?.categories||[]).find(x=>x.id===ed.dataset.editCategory);if(c)openCategory(c);}if(del)deleteCategory(del.dataset.deleteCategory);});
   $('#profileForm').addEventListener('submit',e=>{e.preventDefault();saveProfile();});$('#changePhotoBtn').addEventListener('click',()=>$('#photoInput').click());$('#photoInput').addEventListener('change',e=>{if(e.target.files?.[0])openPhoto(e.target.files[0]);e.target.value='';});$('#closeCropBtn').addEventListener('click',()=>$('#cropDialog').close());$('#cancelCropBtn').addEventListener('click',()=>$('#cropDialog').close());$('#cropZoom').addEventListener('input',e=>{crop.scale=Number(e.target.value);drawCrop();});
   const cc=$('#cropCanvas');cc.addEventListener('pointerdown',e=>{crop.drag=true;crop.lastX=e.clientX;crop.lastY=e.clientY;cc.setPointerCapture(e.pointerId);});cc.addEventListener('pointermove',e=>{if(!crop.drag)return;crop.x+=e.clientX-crop.lastX;crop.y+=e.clientY-crop.lastY;crop.lastX=e.clientX;crop.lastY=e.clientY;drawCrop();});cc.addEventListener('pointerup',()=>crop.drag=false);$('#saveCropBtn').addEventListener('click',()=>{state.pendingPhoto=makePhotoData();const pp=$('#profilePhotoPreview');pp.textContent='';pp.style.backgroundImage=`url(${state.pendingPhoto})`;$('#cropDialog').close();toast('Crop siap. Klik Simpan Profil.');});
 
